@@ -17,6 +17,20 @@ fi
 : "${ER_USER:=ubnt}"
 : "${GOOS:=linux}"
 : "${GOARCH:=mipsle}"
+: "${LAN_MGMT_GATEWAY:=192.168.10.1}"
+: "${LAN_MGMT_CIDR:=192.168.10.0/24}"
+: "${LAN2_GATEWAY:=192.168.2.1}"
+: "${LAN3_GATEWAY:=192.168.3.1}"
+: "${LAN4_GATEWAY:=192.168.4.1}"
+: "${TUNNEL_NAME:=er-x-home}"
+
+# Default LAN CIDR set advertised to WARP. Override in config.env or shell env
+# with: CF_LAN_CIDRS=( 192.168.10.0/24 ... )
+if [ -z "${CF_LAN_CIDRS+x}" ]; then
+  CF_LAN_CIDRS=( 192.168.1.0/24 192.168.2.0/24 192.168.3.0/24 192.168.4.0/24 192.168.10.0/24 )
+fi
+: "${CF_PIN_WIREGUARD:=1}"
+: "${CF_APPLY_SPLIT_TUNNEL:=0}"
 
 log()  { printf '\033[1;32m==> %s\033[0m\n' "$*" >&2; }
 warn() { printf '\033[1;33m==> %s\033[0m\n' "$*" >&2; }
