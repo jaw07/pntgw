@@ -1,0 +1,10 @@
+pntgw
+pntgw-mipsle
+pntgw-amd64
+pntgw-arm64
+/tmp
+*.test
+*.out
+.DS_Store
+.idea/
+.vscode/

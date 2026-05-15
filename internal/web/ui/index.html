@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>pntgw — Starshield PNT gateway</title>
+<style>
+  body { font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+         background: #111; color: #ddd; margin: 0; padding: 24px; max-width: 720px; }
+  h1 { font-weight: 600; font-size: 18px; letter-spacing: .02em; margin: 0 0 4px; }
+  h2 { font-weight: 500; font-size: 14px; color: #888; margin: 24px 0 8px; text-transform: uppercase; letter-spacing: .08em; }
+  .card { background: #1c1c1c; border: 1px solid #2a2a2a; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; justify-content: space-between; padding: 4px 0; }
+  .row > .k { color: #888; }
+  .row > .v { font-feature-settings: "tnum"; }
+  input[type=text], input[type=number] {
+    background: #111; color: #ddd; border: 1px solid #2a2a2a;
+    padding: 6px 8px; border-radius: 4px; font: inherit; width: 100%; box-sizing: border-box;
+  }
+  button { background: #2a5; color: #fff; border: 0; padding: 6px 12px; border-radius: 4px;
+           font: inherit; cursor: pointer; }
+  button.danger { background: #944; }
+  button.flat { background: #333; }
+  ul.dests { list-style: none; padding: 0; margin: 0; }
+  ul.dests li { display: flex; gap: 8px; padding: 4px 0; }
+  ul.dests li input { flex: 1; }
+  .add { display: flex; gap: 8px; margin-top: 8px; }
+  .add input { flex: 1; }
+  .status-bad { color: #e66; }
+  .status-good { color: #6c6; }
+  pre.nmea { background: #0a0a0a; padding: 8px; border-radius: 4px; font-size: 11px;
+             max-height: 180px; overflow-y: scroll; color: #8a8; margin: 0; }
+  .controls { display: flex; gap: 8px; margin-top: 12px; }
+  label { display: block; margin: 8px 0 4px; color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+</style>
+</head>
+<body>
+  <h1>pntgw <span style="color:#666;font-weight:400">— Starshield PNT gateway</span></h1>
+  <div id="hwline" style="color:#666;font-size:12px;">connecting…</div>
+
+  <h2>Live status</h2>
+  <div class="card">
+    <div class="row"><span class="k">Position</span><span class="v" id="pos">—</span></div>
+    <div class="row"><span class="k">Altitude</span><span class="v" id="alt">—</span></div>
+    <div class="row"><span class="k">Uncertainty</span><span class="v" id="unc">—</span></div>
+    <div class="row"><span class="k">Satellites</span><span class="v" id="sats">—</span></div>
+    <div class="row"><span class="k">Fix valid</span><span class="v" id="valid">—</span></div>
+    <div class="row"><span class="k">Last poll</span><span class="v" id="age">—</span></div>
+    <div class="row"><span class="k">TCP clients</span><span class="v" id="tcpc">—</span></div>
+    <div class="row"><span class="k">UDP destinations</span><span class="v" id="udpc">—</span></div>
+  </div>
+
+  <h2>Recent NMEA</h2>
+  <div class="card"><pre class="nmea" id="nmea">—</pre></div>
+
+  <h2>Config</h2>
+  <div class="card">
+    <label>Poll interval (ms)</label>
+    <input type="number" id="cfg_poll" min="100" max="10000">
+
+    <label>Dish address (host:port)</label>
+    <input type="text" id="cfg_dish">
+
+    <label>TCP bind (host:port, blank to disable)</label>
+    <input type="text" id="cfg_tcp">
+
+    <label>UDP destinations</label>
+    <ul class="dests" id="cfg_udp"></ul>
+    <div class="add">
+      <input type="text" id="cfg_udp_new" placeholder="host:port">
+      <button class="flat" onclick="addDest()">Add</button>
+    </div>
+
+    <div class="controls">
+      <button onclick="save()">Save</button>
+      <button class="flat" onclick="load()">Discard</button>
+    </div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+let lastPollAt = 0;
+
+async function load() {
+  const c = await fetch("/api/config").then(r => r.json());
+  $("cfg_poll").value = c.poll_interval_ms;
+  $("cfg_dish").value = c.dish_addr;
+  $("cfg_tcp").value = c.tcp && c.tcp.enabled ? c.tcp.bind : "";
+  const ul = $("cfg_udp"); ul.innerHTML = "";
+  (c.udp_destinations || []).forEach(d => addDestRow(d));
+}
+
+function addDestRow(value) {
+  const li = document.createElement("li");
+  const input = document.createElement("input"); input.type = "text"; input.value = value || "";
+  const btn = document.createElement("button"); btn.className = "danger"; btn.textContent = "×";
+  btn.onclick = () => li.remove();
+  li.appendChild(input); li.appendChild(btn);
+  $("cfg_udp").appendChild(li);
+}
+
+function addDest() {
+  const v = $("cfg_udp_new").value.trim();
+  if (!v) return;
+  addDestRow(v);
+  $("cfg_udp_new").value = "";
+}
+
+async function save() {
+  const dests = Array.from($("cfg_udp").querySelectorAll("input")).map(i => i.value.trim()).filter(Boolean);
+  const tcpBind = $("cfg_tcp").value.trim();
+  const body = {
+    poll_interval_ms: Number($("cfg_poll").value),
+    dish_addr: $("cfg_dish").value.trim(),
+    tcp: { enabled: tcpBind !== "", bind: tcpBind || "0.0.0.0:10110" },
+    udp_destinations: dests,
+  };
+  const r = await fetch("/api/config", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) alert("save failed: " + await r.text());
+  else load();
+}
+
+async function tick() {
+  try {
+    const s = await fetch("/api/status").then(r => r.json());
+    $("hwline").textContent = (s.hw || "") + " · " + (s.sw || "");
+    $("pos").textContent = s.valid ? (s.lat.toFixed(6) + ", " + s.lon.toFixed(6)) : "—";
+    $("alt").textContent = s.valid ? (s.alt_m.toFixed(1) + " m") : "—";
+    $("unc").textContent = s.unc_m ? ("±" + s.unc_m.toFixed(2) + " m") : "—";
+    $("sats").textContent = s.sats;
+    $("valid").innerHTML = s.valid
+      ? '<span class="status-good">YES</span>'
+      : '<span class="status-bad">NO</span>';
+    $("tcpc").textContent = s.tcp_clients;
+    $("udpc").textContent = s.udp_dests;
+    if (s.last_poll_ms) {
+      lastPollAt = Date.now();
+      $("age").textContent = "just now";
+    } else {
+      $("age").textContent = "—";
+    }
+    if (s.last_nmea) {
+      $("nmea").textContent = s.last_nmea;
+    }
+  } catch (e) {
+    $("hwline").textContent = "(disconnected from pntgw)";
+  }
+  if (lastPollAt) {
+    const age = Math.floor((Date.now() - lastPollAt) / 1000);
+    if (age > 2) $("age").textContent = age + "s ago";
+  }
+}
+
+load();
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
