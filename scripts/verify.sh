@@ -26,11 +26,13 @@ command -v python3 >/dev/null && green "python3 available" || red "python3 not i
 command -v sshpass >/dev/null && green "sshpass available (needed for bootstrap before key auth)" || skip "sshpass not installed" "needed only for first-time key install"
 
 # --- ER-X reach ---
+# nc -z is portable across BSD nc (macOS) and netcat-openbsd (Linux); ping
+# flags differ between BSD and iputils so we avoid ping entirely.
 log "Checking ER-X at $ER_HOST"
-if ping -c 1 -W 1 -t 1 "$ER_HOST" >/dev/null 2>&1; then
-  green "ER-X pings on $ER_HOST"
+if nc -z -w 2 "$ER_HOST" 22 >/dev/null 2>&1; then
+  green "ER-X TCP/22 reachable on $ER_HOST"
 else
-  red "ER-X unreachable on $ER_HOST" "check ER_HOST in config.env"
+  red "ER-X TCP/22 unreachable on $ER_HOST" "check ER_HOST in config.env or LAN"
 fi
 
 if can_key_ssh; then

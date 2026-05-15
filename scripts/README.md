@@ -2,12 +2,36 @@
 
 Idempotent bash scripts that turn a fresh EdgeRouter X into the full edge stack: network + NTP + cloudflared tunnel + pntgw. Each script is safe to re-run.
 
+Tested on macOS and Ubuntu. `verify.sh` will tell you up front if anything's missing.
+
+## Host requirements
+
+Both platforms need: `bash` (>=3.2), `ssh`, `scp`, `nc`, `curl`, `python3`, `go` (>=1.22), `make`, `git`.
+
+### macOS
+
+```sh
+brew install go
+brew install hudochenkov/sshpass/sshpass     # tapped formula; sshpass is intentionally not in the main brew repo
+```
+
+`ssh`, `scp`, `nc`, `curl`, `python3`, `make`, `git` ship with macOS / Xcode Command Line Tools.
+
+### Ubuntu / Debian
+
+```sh
+sudo apt update
+sudo apt install -y bash ssh netcat-openbsd curl python3 make git sshpass
+# Go: install from https://go.dev/dl or via snap (`sudo snap install go --classic`)
+```
+
+`sshpass` is only used during the very first bootstrap run (to install your SSH key into Vyatta config before key auth exists). After that, the scripts use key auth only.
+
 ## Two ways to supply credentials
 
 **Option 1 — interactive prompts (default).** Just run the script. It prompts for any missing values:
 
 ```sh
-brew install sshpass         # needed only by bootstrap.sh for password-auth before key install
 ./bootstrap.sh
 ER-X admin password (ubnt user): ****
 ```
