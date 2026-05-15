@@ -89,6 +89,5 @@ See [docs/edgerouter.md](docs/edgerouter.md) for the full end-to-end build: base
 
 ## Roadmap
 
-- XGPS / GDL90 UDP framing for native ForeFlight discovery
 - MAVLink GPS injection (Pixhawk / Cube)
 - Optional `/metrics` Prometheus endpoint on pntgw
