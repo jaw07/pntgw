@@ -1,7 +1,7 @@
-pntgw
-pntgw-mipsle
-pntgw-amd64
-pntgw-arm64
+/pntgw
+/pntgw-mipsle
+/pntgw-amd64
+/pntgw-arm64
 /tmp
 *.test
 *.out
