@@ -21,15 +21,18 @@ log "Verifying environment"
 # --- local toolchain ---
 command -v go >/dev/null      && green "go available ($(go version | awk '{print $3}'))" || red "go not installed" "needed for cross-compile"
 command -v ssh >/dev/null     && green "ssh available" || red "ssh not installed"
+command -v scp >/dev/null     && green "scp available" || red "scp not installed"
 command -v curl >/dev/null    && green "curl available" || red "curl not installed"
 command -v python3 >/dev/null && green "python3 available" || red "python3 not installed" "needed for JSON parsing"
 command -v sshpass >/dev/null && green "sshpass available (needed for bootstrap before key auth)" || skip "sshpass not installed" "needed only for first-time key install"
+# make and nc are no longer required — go build is invoked directly and
+# reachability uses bash /dev/tcp.
 
 # --- ER-X reach ---
-# nc -z is portable across BSD nc (macOS) and netcat-openbsd (Linux); ping
-# flags differ between BSD and iputils so we avoid ping entirely.
+# bash /dev/tcp instead of nc/ping — portable across Linux, macOS, and
+# Git Bash on Windows, no external binary, no BSD/iputils flag drift.
 log "Checking ER-X at $ER_HOST"
-if nc -z -w 2 "$ER_HOST" 22 >/dev/null 2>&1; then
+if tcp_open "$ER_HOST" 22; then
   green "ER-X TCP/22 reachable on $ER_HOST"
 else
   red "ER-X TCP/22 unreachable on $ER_HOST" "check ER_HOST in config.env or LAN"

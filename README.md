@@ -40,6 +40,22 @@ make erx        # static MIPS LE for the ER-X
 make deploy     # build + scp + restart on 192.168.10.1
 ```
 
+`make` is convenience only. The build is a single `go build` and works
+from any host with Go — Linux, macOS, or native Windows (no make, no
+bash needed for the build itself):
+
+```sh
+CGO_ENABLED=0 GOOS=linux GOARCH=mipsle go build -ldflags="-s -w" -o pntgw-mipsle ./cmd/pntgw
+```
+```powershell
+# Windows PowerShell
+$env:CGO_ENABLED=0; $env:GOOS="linux"; $env:GOARCH="mipsle"
+go build -ldflags="-s -w" -o pntgw-mipsle ./cmd/pntgw
+```
+
+The deploy *scripts* (`scripts/`) are bash and need a POSIX shell — on
+Windows use WSL2 or Git Bash. See [scripts/README.md](scripts/README.md).
+
 ### Config
 
 YAML at `/config/pntgw.yaml`, auto-created with defaults on first run:

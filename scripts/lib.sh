@@ -131,6 +131,17 @@ can_key_ssh() {
   er_ssh "true" >/dev/null 2>&1
 }
 
+# TCP reachability with zero external binaries — bash's /dev/tcp works on
+# Linux, macOS (bash 3.2), and Git Bash. No `nc` (absent in Git Bash),
+# no `timeout` (absent on macOS), no `ping` (BSD/iputils flag drift).
+# For a LAN host this connects or refuses near-instantly; the only slow
+# case is a DROP firewall, which doesn't apply to your own router.
+tcp_open() {
+  local host="$1" port="$2"
+  ( exec 3<>"/dev/tcp/$host/$port" ) 2>/dev/null && return 0
+  return 1
+}
+
 # CF v4 API helper. Takes METHOD PATH [BODY].
 cf_api() {
   require_env CF_TOKEN

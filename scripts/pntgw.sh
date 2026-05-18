@@ -13,7 +13,10 @@ require_env ER_PASS
 BIN="$REPO_DIR/pntgw-mipsle"
 
 log "Cross-compiling pntgw ($GOOS/$GOARCH)"
-(cd "$REPO_DIR" && make erx)
+# Direct `go build` (no make dependency) so this works on any host with
+# Go — including Git Bash on Windows where `make` is absent.
+( cd "$REPO_DIR" && CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
+    go build -ldflags="-s -w" -o "$BIN" ./cmd/pntgw )
 ls -lh "$BIN"
 
 log "Pushing binary to ER-X"
