@@ -3,6 +3,8 @@
 .vscode/
 *.out
 *.test
+/cloudflared
+/cloudflared-mipsle
 /pntgw
 /pntgw-amd64
 /pntgw-arm64
