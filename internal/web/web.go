@@ -30,22 +30,25 @@ type Snapshot struct {
 	LastNMEA   string  `json:"last_nmea"`
 	TCPClients int     `json:"tcp_clients"`
 	UDPDests   int     `json:"udp_dests"`
+	PNTSource  string  `json:"pnt_source"` // "gps" | "starshield" | "unknown"
 }
 
 type Server struct {
-	cfg    *config.Store
-	snap   func() Snapshot
-	notify chan struct{}
+	cfg       *config.Store
+	snap      func() Snapshot
+	notify    chan struct{}
+	setSource func(starshield bool) error
 
 	mu     sync.Mutex
 	server *http.Server
 }
 
 // New returns a Server that reads from cfg and calls snap() for live status.
-// notify is signalled (non-blocking) whenever config is updated through the API,
-// so the supervisor can re-apply runtime state.
-func New(cfg *config.Store, snap func() Snapshot, notify chan struct{}) *Server {
-	return &Server{cfg: cfg, snap: snap, notify: notify}
+// notify is signalled (non-blocking) whenever config is updated through the API.
+// setSource issues the dish PNT-source switch; it is only ever called from an
+// explicit user action on /api/pnt-source.
+func New(cfg *config.Store, snap func() Snapshot, notify chan struct{}, setSource func(starshield bool) error) *Server {
+	return &Server{cfg: cfg, snap: snap, notify: notify, setSource: setSource}
 }
 
 func (s *Server) Start(bind string) error {
@@ -63,6 +66,7 @@ func (s *Server) Start(bind string) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/status", s.handleStatus)
 	mux.HandleFunc("/api/config", s.handleConfig)
+	mux.HandleFunc("/api/pnt-source", s.handlePNTSource)
 	mux.Handle("/", http.FileServer(http.FS(sub)))
 
 	srv := &http.Server{
@@ -92,6 +96,43 @@ func (s *Server) Stop() {
 		_ = s.server.Shutdown(ctx)
 		s.server = nil
 	}
+}
+
+// handlePNTSource: POST {"source":"gps"|"starshield"} flips the dish PNT
+// source. No persistence — the dish holds runtime state, reboot clears it,
+// pntgw never re-asserts.
+func (s *Server) handlePNTSource(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		Source string `json:"source"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var starshield bool
+	switch body.Source {
+	case "starshield":
+		starshield = true
+	case "gps":
+		starshield = false
+	default:
+		http.Error(w, `source must be "gps" or "starshield"`, http.StatusBadRequest)
+		return
+	}
+	if s.setSource == nil {
+		http.Error(w, "pnt source switching unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if err := s.setSource(starshield); err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"ok":true,"source":"` + body.Source + `"}`))
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {

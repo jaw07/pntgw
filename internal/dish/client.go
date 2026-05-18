@@ -142,6 +142,53 @@ func (c *Client) Poll(ctx context.Context) (*PNT, error) {
 	return p, nil
 }
 
+// SetInhibitGPS opens a short-lived connection to the dish and issues
+// dish_inhibit_gps. inhibit=true switches the terminal to its non-GPS
+// (Starshield LEO) PNT source; false returns it to GPS. The dish holds
+// this as runtime-only state — it clears on a dish/router reboot.
+//
+// Deliberately standalone (not on the polling client) so the web layer
+// can call it without sharing the poll loop's connection. It is only
+// ever invoked on an explicit user action.
+func SetInhibitGPS(ctx context.Context, addr string, inhibit bool) error {
+	c, err := Dial(ctx, addr)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+
+	svc, err := c.rc.ResolveService("SpaceX.API.Device.Device")
+	if err != nil {
+		return fmt.Errorf("resolve service: %w", err)
+	}
+	handle := svc.FindMethodByName("Handle")
+	if handle == nil {
+		return errors.New("Handle method not found")
+	}
+	reqDesc := handle.GetInputType()
+
+	req := dynamic.NewMessage(reqDesc)
+	fd := reqDesc.FindFieldByName("dish_inhibit_gps")
+	if fd == nil || fd.GetMessageType() == nil {
+		return errors.New("dish_inhibit_gps not in Request schema")
+	}
+	sub := dynamic.NewMessage(fd.GetMessageType())
+	inhibitFD := sub.GetMessageDescriptor().FindFieldByName("inhibit_gps")
+	if inhibitFD == nil {
+		return errors.New("inhibit_gps field not found")
+	}
+	if err := sub.TrySetField(inhibitFD, inhibit); err != nil {
+		return fmt.Errorf("set inhibit_gps: %w", err)
+	}
+	if err := req.TrySetField(fd, sub); err != nil {
+		return fmt.Errorf("set dish_inhibit_gps: %w", err)
+	}
+	if _, err := c.stub.InvokeRpc(ctx, handle, req); err != nil {
+		return fmt.Errorf("invoke dish_inhibit_gps: %w", err)
+	}
+	return nil
+}
+
 // setOneof sets a oneof request field to an empty sub-message of the named type.
 func setOneof(msg *dynamic.Message, fieldName string, parentDesc interface{}, _ string) error {
 	fd := msg.GetMessageDescriptor().FindFieldByName(fieldName)

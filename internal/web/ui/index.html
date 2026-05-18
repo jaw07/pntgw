@@ -44,6 +44,13 @@
     <div class="row"><span class="k">Uncertainty</span><span class="v" id="unc">—</span></div>
     <div class="row"><span class="k">Satellites</span><span class="v" id="sats">—</span></div>
     <div class="row"><span class="k">Fix valid</span><span class="v" id="valid">—</span></div>
+    <div class="row">
+      <span class="k">PNT source</span>
+      <span class="v">
+        <span id="pntsrc">—</span>
+        <button class="flat" id="pntbtn" style="margin-left:8px;padding:2px 8px;" onclick="togglePNT()">switch</button>
+      </span>
+    </div>
     <div class="row"><span class="k">Last poll</span><span class="v" id="age">—</span></div>
     <div class="row"><span class="k">TCP clients</span><span class="v" id="tcpc">—</span></div>
     <div class="row"><span class="k">UDP destinations</span><span class="v" id="udpc">—</span></div>
@@ -124,6 +131,27 @@ async function save() {
   else load();
 }
 
+async function togglePNT() {
+  const cur = window._pntsrc;
+  if (cur !== "gps" && cur !== "starshield") return;
+  const next = cur === "gps" ? "starshield" : "gps";
+  const label = next === "starshield"
+    ? "Switch PNT source to Starshield-constellation (GPS inhibited)?"
+    : "Switch PNT source back to GPS?";
+  if (!confirm(label)) return;
+  $("pntbtn").disabled = true;
+  try {
+    const r = await fetch("/api/pnt-source", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: next }),
+    });
+    if (!r.ok) alert("switch failed: " + await r.text());
+  } finally {
+    $("pntbtn").disabled = false;
+  }
+}
+
 async function tick() {
   try {
     const s = await fetch("/api/status").then(r => r.json());
@@ -137,6 +165,17 @@ async function tick() {
       : '<span class="status-bad">NO</span>';
     $("tcpc").textContent = s.tcp_clients;
     $("udpc").textContent = s.udp_dests;
+    window._pntsrc = s.pnt_source;
+    if (s.pnt_source === "starshield") {
+      $("pntsrc").innerHTML = '<span class="status-good">STARSHIELD</span>';
+      $("pntbtn").textContent = "→ GPS";
+    } else if (s.pnt_source === "gps") {
+      $("pntsrc").textContent = "GPS";
+      $("pntbtn").textContent = "→ Starshield";
+    } else {
+      $("pntsrc").textContent = "—";
+      $("pntbtn").textContent = "switch";
+    }
     if (s.last_poll_ms) {
       lastPollAt = Date.now();
       $("age").textContent = "just now";

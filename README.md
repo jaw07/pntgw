@@ -30,6 +30,7 @@ Single static daemon, the only thing in this repo as actual source.
 - Emits the four core NMEA-0183 sentences (`$GPGGA`, `$GPRMC`, `$GPZDA`, `$GPGSA`) with correct XOR checksums and DMM coordinates
 - TCP listener (gpsd-compatible: `gpsd tcp://erx:port`, multi-client) plus N configured UDP unicast destinations
 - Web UI on the management interface: live status, add/remove UDP destinations, edit TCP bind and poll interval, all persisted to YAML
+- **PNT-source toggle**: switch the dish between GPS and Starshield-constellation PNT (`dish_inhibit_gps`). On a Starshield-provisioned terminal, inhibiting GPS falls back to LEO ranging — the fix stays valid and live but uncertainty rises from ~1.5 m (GPS) to ~5-16 m (Starshield). The toggle is not persisted and never auto-applied: pntgw only issues the switch on an explicit UI/API action. The dish holds it as runtime state, so a dish/router reboot returns to GPS.
 
 ### Build
 

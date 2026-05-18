@@ -54,6 +54,7 @@ func main() {
 			TCPClients: tcp.ClientCount(),
 			UDPDests:   udp.DestCount(),
 		}
+		s.PNTSource = "unknown"
 		if p != nil {
 			s.HW = p.HardwareVersion
 			s.SW = p.SoftwareVersion
@@ -64,12 +65,24 @@ func main() {
 			s.Sats = p.Sats
 			s.Valid = p.Valid
 			s.LastPollMs = p.Time.UnixMilli()
+			if p.InhibitGPS {
+				s.PNTSource = "starshield"
+			} else {
+				s.PNTSource = "gps"
+			}
 		}
 		return s
 	}
 
 	cfgChanged := make(chan struct{}, 1)
-	w := web.New(cfg, snap, cfgChanged)
+	// setSource is invoked only from an explicit user action on the web UI.
+	// Short-lived connection; pntgw never auto-applies or re-asserts this.
+	setSource := func(starshield bool) error {
+		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		defer cancel()
+		return dish.SetInhibitGPS(ctx, cfg.Get().DishAddr, starshield)
+	}
+	w := web.New(cfg, snap, cfgChanged, setSource)
 
 	// Apply config to sinks/listeners. Re-applies safely on change.
 	apply := func(c *config.Config) {
