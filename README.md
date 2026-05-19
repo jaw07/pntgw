@@ -98,11 +98,14 @@ internal/udpsink/            UDP unicast sender (N destinations)
 internal/web/                HTTP server + embedded UI assets
 Makefile                     build / erx / deploy targets
 docs/edgerouter.md           full ER-X deployment guide (pntgw + cloudflared)
+docs/mesh-join.md            join the ER-X into a WARP Connector mesh on another account
 ```
 
 ## EdgeOS deployment
 
 See [docs/edgerouter.md](docs/edgerouter.md) for the full end-to-end build: base ER-X setup, four-LAN config, Starshield wiring, NTP, cloudflared tunnel + WARP private networks + split-tunnel surgery, pntgw service, and account-swap procedures.
+
+To make the ER-X reachable from a **WARP Connector mesh that lives in a collaborator's Cloudflare account** (you were invited in as an admin member), see [docs/mesh-join.md](docs/mesh-join.md): account-identity pitfalls, mesh-vnet routing, the connector vs default-policy profile distinction, and why a MIPS cloudflared box is a routed leaf rather than a mesh node.
 
 ## Roadmap
 
